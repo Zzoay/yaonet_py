@@ -8,8 +8,7 @@ class Dependency():
 
     def __init__(self, 
                  tensor:'Tensor',
-                 grad_fn: Callable[[np.ndarray], np.ndarray]
-                 ) -> None: 
+                 grad_fn: Callable[[np.ndarray], np.ndarray]) -> None: 
         self.tensor = tensor
         self.grad_fn = grad_fn
 
@@ -33,24 +32,32 @@ def ensure_tensor(tensorable: Tensorable) -> 'Tensor':
 
 
 # TODO: make a basic class of tensor, only with data and some func about data, then the "Tensor" class extends it.
+class BasicTensor(object):
+    def __init__(self, 
+                 data: Arrayable) -> None:
+        self.data = ensure_array(data)
+        self.shape = self.data.shape
+        self.ndim = self.data.ndim
+
+    def __repr__(self) -> str:
+        return f"Basic Tensor({self.data})"
+
+    def tolist(self):
+        return self.data.tolist()
 
 
 # a tensor includes data and dependency info.
-class Tensor:
+class Tensor(BasicTensor):
 
     def __init__(self,
                  data: Arrayable,
                  requires_grad: bool = False,
-                 depends_on: List[Dependency] = [],
-                 ) -> None:
+                 depends_on: List[Dependency] = []) -> None:
         # self.data = ensure_array(data)
-        self.data = data
+        super().__init__(data)
         self.requires_grad = requires_grad
         self.depends_on = depends_on
         self.grad: np.ndarray = None
-
-        self.shape = self.data.shape
-        self.ndim = self.data.ndim
 
         if self.requires_grad:
             self.zero_grad()
@@ -59,7 +66,7 @@ class Tensor:
         return f"Tensor({self.data}, requires_grad={self.requires_grad})"
 
     def zero_grad(self) -> None:
-        self.grad = np.zeros_like(self.data, dtype=np.float64)
+        self.grad = Tensor(np.zeros_like(self.data, dtype=np.float64))
 
     # t + other
     def __add__(self, other) -> 'Tensor':
@@ -82,11 +89,11 @@ class Tensor:
 
         if grad is None:
             if self.shape == ():
-                grad = np.array(1.0)
+                grad = Tensor(1.0)
             else:
                 raise RuntimeError("grad must be specified for non-0-tensor")
 
-        self.grad = self.grad + grad
+        self.grad.data = self.grad.data + grad.data
 
         for dependency in self.depends_on:
             backward_grad = dependency.grad_fn(grad)
@@ -137,14 +144,14 @@ def t_add(t1:Tensor, t2:Tensor) -> Tensor:
 
 
 if __name__ == "__main__":
-    t1 = Tensor(np.array([1, 2, 3]), requires_grad=True)
-    t2 = Tensor(np.array([4, 5, 6]), requires_grad=True)
+    t1 = Tensor([1, 2, 3], requires_grad=True)
+    t2 = Tensor([4, 5, 6], requires_grad=True)
 
     t3 = t1 + t2
 
     assert t3.data.tolist() == [5, 7, 9]
 
-    t3.backward(np.array([-1., -2., -3.]))
+    t3.backward(Tensor([-1., -2., -3.]))
 
     assert t1.grad.tolist() == [-1, -2, -3]
     assert t2.grad.tolist() == [-1, -2, -3]
