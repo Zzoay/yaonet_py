@@ -59,6 +59,9 @@ class BasicTensor(object):
     def tolist(self):
         return self.data.tolist()
 
+    def toarray(self):
+        return self.data
+
 
 # a tensor includes data and dependency info.
 class Tensor(BasicTensor):
@@ -102,30 +105,41 @@ class Tensor(BasicTensor):
     def __radd__(self, other) :
         return t_add(ensure_tensor(other), self)
     
+    # t = t + other
     def __iadd__(self, other):
         self.data = self.data + ensure_tensor(other).data
         return self
 
-    # TODO: add mul, neg, sub, matmul and so on.
     def __mul__(self, other):
-        raise NotImplementedError
+        return t_mul(self, ensure_tensor(other))
     
+    def __rmul__(self, other) :
+        return t_mul(ensure_tensor(other), self)
+    
+    def __imul__(self, other):
+        self.data = self.data * ensure_tensor(other).data
+        return self
+
     def __neg__(self):
-        raise NotImplementedError
+        return t_neg(self)
 
     def __sub__(self, other):
-        raise NotImplementedError
+        return t_sub(self, ensure_tensor(other))
     
     def __rsub__(self, other):
-        raise NotImplementedError
+        return t_sub(ensure_tensor(other), self)
 
     def __isub__(self, other):
-        raise NotImplementedError
-    
-    def __matmul__(self, other):
-        raise NotImplementedError
+        self.data = self.data - ensure_tensor(other).data
+        return self
 
-    def backward(self, grad: 'Tensor' = None) -> None:
+    def __matmul__(self, other):
+        return t_matmul(self, ensure_tensor(other))
+
+    def __getitem__(self, index):
+        return _slice(self, index)
+        
+    def backward(self, grad: np.ndarray = None) -> None:
         assert self.requires_grad, "called backward on non-requires-grad tensor"
 
         if grad is None:
@@ -133,6 +147,10 @@ class Tensor(BasicTensor):
                 grad = np.array(1.0)
             else:
                 raise RuntimeError("grad must be specified for non-0-tensor")
+        elif isinstance(grad, Tensor):
+            grad = grad.toarray()
+        elif isinstance(grad, List):
+            grad = np.array(grad)
 
         self.grad = self.grad + grad
 
@@ -141,7 +159,7 @@ class Tensor(BasicTensor):
             dependency.tensor.backward(backward_grad)
 
 
-def t_sum(t:Tensor) -> Tensor:
+def t_sum(t: Tensor) -> Tensor:
     """
     Takes a tensor and returns the 0-tensor
     that's the sum of all its elements.
@@ -155,6 +173,7 @@ def t_sum(t:Tensor) -> Tensor:
             grad is necessarily a 0-tensor, so each input element
             contributes that much
             """
+            # the gradient of function 'sum' is 1 to all elements
             return grad * np.ones_like(t.data)
 
         depends_on = [Dependency(t, grad_fn)]
@@ -167,7 +186,7 @@ def t_sum(t:Tensor) -> Tensor:
                   depends_on)
 
 
-def t_add(t1:Tensor, t2:Tensor) -> Tensor:
+def t_add(t1: Tensor, t2: Tensor) -> Tensor:
     data: Tensor = t1.data + t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
@@ -210,7 +229,7 @@ def t_add(t1:Tensor, t2:Tensor) -> Tensor:
                   depends_on)
 
 
-def t_mul(t1:Tensor, t2:Tensor) -> Tensor:
+def t_mul(t1: Tensor, t2: Tensor) -> Tensor:
     data: Tensor = t1.data * t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
@@ -259,3 +278,62 @@ def t_mul(t1:Tensor, t2:Tensor) -> Tensor:
             requires_grad,
             depends_on)
 
+
+def t_neg(t: Tensor) -> Tensor:
+    data = -t.data
+    requires_grad = t.requires_grad
+
+    if requires_grad:
+        depends_on = [Dependency(t, lambda x: -x)]
+    else:
+        depends_on = []
+
+    return Tensor(data, requires_grad, depends_on)
+
+
+def t_sub(t1: Tensor, t2: Tensor) -> Tensor:
+    return t1 + -t2
+
+
+def t_matmul(t1: Tensor, t2: Tensor) -> Tensor:
+    data = np.matmul(t1.data, t2.data)
+    requires_grad = t1.requires_grad or t2.requires_grad
+
+    depends_on: List[Dependency] = []
+
+    if t1.requires_grad:
+        def grad_fn1(grad: np.ndarray) -> np.ndarray:
+            # where t3 = t1 @ t2 (@ means matmul), t1 is (a ,b), t2 is (b, c) -> t3 (a, c)
+            # chain rule: grad1 = grad3 @ t2.T
+            return np.matmul(grad, t2.data.T)  # 'grad @ t2.data.T' also work
+
+        depends_on.append(Dependency(t1, grad_fn1))
+
+    if t2.requires_grad:
+        def grad_fn2(grad: np.ndarray) -> np.ndarray:
+            # chain rule: grad2 = t1.T @ grad3 
+            return np.matmul(t1.data.T, grad)
+
+        depends_on.append(Dependency(t2, grad_fn2))
+
+    return Tensor(data,
+                  requires_grad,
+                  depends_on)
+
+
+def _slice(t: Tensor, idxs) -> Tensor:
+    data = t.data[idxs]
+    requires_grad = t.requires_grad
+
+    if requires_grad:
+        def grad_fn(grad: np.ndarray) -> np.ndarray:
+            # only the idxs place can recieve grad, other is 0
+            whole_t_grad = np.zeros_like(t.data)
+            whole_t_grad[idxs] = grad
+            return whole_t_grad
+
+        depends_on = [Dependency(t, grad_fn)]
+    else:
+        depends_on = []
+
+    return Tensor(data, requires_grad, depends_on)
