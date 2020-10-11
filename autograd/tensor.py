@@ -59,20 +59,6 @@ class BasicTensor(object):
     def tolist(self):
         return self.data.tolist()
 
-    def sum(self, **kwargs):
-        return ensure_basicTensor(self.data.sum(**kwargs))
-
-    def __add__(self, other):
-        return ensure_basicTensor(self.data + ensure_basicTensor(other).data)
-    
-    def __radd__(self, other):
-        return ensure_basicTensor(ensure_basicTensor(other).data + self.data)
-
-    # t += other
-    def __iadd__(self, other):
-        self.data = self.data + ensure_tensor(other).data
-        return self
-
 
 # a tensor includes data and dependency info.
 class Tensor(BasicTensor):
@@ -84,7 +70,7 @@ class Tensor(BasicTensor):
         super().__init__(data)
         self.requires_grad = requires_grad
         self.depends_on = depends_on
-        self.grad: BasicTensor = None
+        self.grad: np.ndarray = None
 
         if self.requires_grad:
             self.zero_grad()
@@ -103,7 +89,7 @@ class Tensor(BasicTensor):
         return f"Tensor({self.data}, requires_grad={self.requires_grad})"
 
     def zero_grad(self) -> None:
-        self.grad = BasicTensor(np.zeros_like(self.data, dtype=np.float64))
+        self.grad = np.zeros_like(self.data, dtype=np.float64)
 
     def sum(self) -> 'Tensor':
         return t_sum(self)
@@ -116,12 +102,27 @@ class Tensor(BasicTensor):
     def __radd__(self, other) :
         return t_add(ensure_tensor(other), self)
     
-    # def __iadd__(self, other):
-    #     self.data = self.data + ensure_tensor(other).data
-    #     return self
+    def __iadd__(self, other):
+        self.data = self.data + ensure_tensor(other).data
+        return self
 
     # TODO: add mul, neg, sub, matmul and so on.
     def __mul__(self, other):
+        raise NotImplementedError
+    
+    def __neg__(self):
+        raise NotImplementedError
+
+    def __sub__(self, other):
+        raise NotImplementedError
+    
+    def __rsub__(self, other):
+        raise NotImplementedError
+
+    def __isub__(self, other):
+        raise NotImplementedError
+    
+    def __matmul__(self, other):
         raise NotImplementedError
 
     def backward(self, grad: 'Tensor' = None) -> None:
@@ -129,7 +130,7 @@ class Tensor(BasicTensor):
 
         if grad is None:
             if self.shape == ():
-                grad = BasicTensor(1.0)
+                grad = np.array(1.0)
             else:
                 raise RuntimeError("grad must be specified for non-0-tensor")
 
@@ -154,7 +155,7 @@ def t_sum(t:Tensor) -> Tensor:
             grad is necessarily a 0-tensor, so each input element
             contributes that much
             """
-            return grad * ensure_basicTensor(np.ones_like(t.data))
+            return grad * np.ones_like(t.data)
 
         depends_on = [Dependency(t, grad_fn)]
 
@@ -184,7 +185,7 @@ def t_add(t1:Tensor, t2:Tensor) -> Tensor:
                 if dim == 1:
                     grad = grad.sum(axis=i, keepdims=True)
 
-            return ensure_basicTensor(grad)
+            return grad
 
         depends_on.append(Dependency(t1, grad_fn1))
 
@@ -200,7 +201,7 @@ def t_add(t1:Tensor, t2:Tensor) -> Tensor:
                 if dim == 1:
                     grad = grad.sum(axis=i, keepdims=True)
 
-            return ensure_basicTensor(grad)
+            return grad
 
         depends_on.append(Dependency(t2, grad_fn2))
 
@@ -214,6 +215,44 @@ def t_mul(t1:Tensor, t2:Tensor) -> Tensor:
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
     depends_on: List[Dependency] = []
+
+    if t1.requires_grad:
+        def grad_fn1(grad: np.ndarray) -> np.ndarray:
+            # chain rule
+            grad = grad * t2.data
+
+            # Sum out added dims
+            ndims_added = grad.ndim - t1.ndim
+            for _ in range(ndims_added):
+                grad = grad.sum(axis=0)
+
+            # Sum across broadcasted (but non-added dims)
+            for i, dim in enumerate(t1.shape):
+                if dim == 1:
+                    grad = grad.sum(axis=i, keepdims=True)
+
+            return grad
+
+        depends_on.append(Dependency(t1, grad_fn1))
+
+    if t2.requires_grad:
+        def grad_fn2(grad: np.ndarray) -> np.ndarray:
+            # chain rule
+            grad = grad * t1.data
+
+            # Sum out added dims
+            ndims_added = grad.ndim - t2.ndim
+            for _ in range(ndims_added):
+                grad = grad.sum(axis=0)
+
+            # Sum across broadcasted (but non-added dims)
+            for i, dim in enumerate(t2.shape):
+                if dim == 1:
+                    grad = grad.sum(axis=i, keepdims=True)
+
+            return grad
+
+        depends_on.append(Dependency(t2, grad_fn2))
 
     return Tensor(
             data,
