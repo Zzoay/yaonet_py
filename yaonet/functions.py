@@ -126,3 +126,10 @@ def log(a: float, t: Tensor) -> Tensor:
     return Tensor(data, 
             requires_grad,
             depends_on)
+
+
+# TODO: add sigmoid function
+def sigmoid(t: Tensor)-> Tensor:
+    t = ensure_tensor(t)  
+
+    return 1 / (1 - exp(-t))
