@@ -12,16 +12,26 @@ class Layer(Module):
     def forward(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
+    def predict(self, inputs: Tensor) -> Tensor:
+        return self.forward(inputs)
+
+    def __call__(self, inputs: Tensor) -> Tensor:
+        return self.forward(inputs)
+
 
 class Linear(Layer):
     def __init__(self, input_shape: int, output_shape: int) -> None:
         super().__init__(input_shape, output_shape)
-
-        self.w = Parameter(self.input_shape)
-        self.b = Parameter()
+        self.w = Parameter(self.input_shape, self.output_shape)
+        self.b = Parameter(1, self.output_shape)
 
     def forward(self, inputs: Tensor) -> Tensor:
         return inputs @ self.w + self.b
     
-    def predict(self, inputs: Tensor) -> Tensor:
-        return self.forward(inputs)
+
+class CNN(Layer):
+    def __init__(self, input_shape: int, output_shape: int) -> None:
+        super().__init__(input_shape, output_shape)
+
+    def forward(self, inputs: Tensor) -> Tensor:
+        raise NotImplementedError
