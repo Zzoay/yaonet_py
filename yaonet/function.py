@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from autograd.tensor import Dependency, Tensor, ensure_tensor
+from yaonet.tensor import Dependency, Tensor, ensure_tensor
 
 
 def sin(t: Tensor) -> Tensor:
