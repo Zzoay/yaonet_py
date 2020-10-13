@@ -1,6 +1,6 @@
 import unittest
 
-from autograd.tensor import Tensor
+from yaonet.tensor import Tensor
 
 class TestTensorSum(unittest.TestCase):
     def test_simple_sum(self):

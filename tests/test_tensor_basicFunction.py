@@ -4,11 +4,11 @@ import pytest
 
 import numpy as np
 
-from autograd.tensor import Tensor
-from autograd.operations import *
+from yaonet.tensor import Tensor
+from yaonet.functions import *
 
 
-class TestTensorMul(unittest.TestCase):
+class TestTensorBscFunstion(unittest.TestCase):
     def test_sin(self):
         # 90, 30, 150
         t1 = Tensor([np.pi/2., np.pi/6., np.pi*(5/6)], requires_grad=True)
