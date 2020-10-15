@@ -1,7 +1,7 @@
 import unittest
 import pytest
 
-from autograd.tensor import Tensor
+from yaonet.tensor import Tensor
 
 class TestTensorSub(unittest.TestCase):
     def test_simple_sub(self):

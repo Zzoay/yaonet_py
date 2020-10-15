@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from autograd.tensor import Dependency, Tensor, t_add, t_sub, t_mul, t_matmul, ensure_tensor
+from yaonet.tensor import Dependency, Tensor, t_add, t_sub, t_mul, t_matmul, ensure_tensor
 
 
 def add(t1: Tensor, t2: Tensor) -> Tensor:

@@ -3,7 +3,7 @@ import pytest
 
 import numpy as np
 
-from autograd.tensor import BasicTensor, Tensor
+from yaonet.tensor import BasicTensor, Tensor
 
 
 class TestTensorSlice(unittest.TestCase):
