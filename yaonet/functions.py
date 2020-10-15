@@ -128,8 +128,35 @@ def log(a: float, t: Tensor) -> Tensor:
             depends_on)
 
 
-# TODO: add sigmoid function
-def sigmoid(t: Tensor)-> Tensor:
+def sigmoid(t: Tensor) -> Tensor:
     t = ensure_tensor(t)  
+    return 1 / (1 + exp(-t))
 
-    return 1 / (1 - exp(-t))
+
+def tanh(t: Tensor) -> Tensor:
+    t = ensure_tensor(t)
+    return (exp(t) - exp(-t)) / (exp(t) + exp(-t))
+
+
+def relu(t: Tensor) -> Tensor:
+    t = ensure_tensor(t)
+
+    data = np.maximum(0, t.data)
+    requires_grad = t.requires_grad
+
+    depends_on = []
+
+    if requires_grad: 
+        def grad_fn(grad: np.ndarray) -> np.ndarray:
+            new_grad = np.zeros_like(t.data)
+
+            idxs = np.where(t.data > 0)
+            new_grad[idxs] = grad[idxs] * t.data[idxs]
+            
+            return new_grad
+
+        depends_on.append(Dependency(t, grad_fn))
+
+    return Tensor(data, 
+            requires_grad,
+            depends_on)

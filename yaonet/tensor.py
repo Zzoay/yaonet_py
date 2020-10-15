@@ -62,6 +62,14 @@ class BasicTensor(object):
     def toarray(self):
         return self.data
 
+    def reshape(self, *shape):
+        self.data = self.data.reshape(*shape)
+        return self
+
+    def ravel(self):
+        self.data = self.data.ravel()
+        return self
+
 
 # a tensor includes data and dependency info.
 class Tensor(BasicTensor):
@@ -136,6 +144,16 @@ class Tensor(BasicTensor):
     def __matmul__(self, other):
         return t_matmul(self, ensure_tensor(other))
 
+    def __truediv__(self, other):
+        return t_div(self, ensure_tensor(other))
+
+    def __rtruediv__(self, other):
+        return t_div(ensure_tensor(other), self)
+    
+    def __itruediv__(self, other):        
+        self.data = self.data / ensure_tensor(other).data
+        return self
+
     def __getitem__(self, index):
         return _slice(self, index)
         
@@ -194,12 +212,12 @@ def t_add(t1: Tensor, t2: Tensor) -> Tensor:
 
     if t1.requires_grad:
         def grad_fn1(grad: np.ndarray) -> np.ndarray:
-            # Sum out added dims
+            # sum out added dims
             ndims_added = grad.ndim - t1.ndim
             for _ in range(ndims_added):
                 grad = grad.sum(axis=0)
 
-            # Sum across broadcasted (but non-added dims)
+            # sum across broadcasted (but non-added dims)
             for i, dim in enumerate(t1.shape):
                 if dim == 1:
                     grad = grad.sum(axis=i, keepdims=True)
@@ -210,12 +228,12 @@ def t_add(t1: Tensor, t2: Tensor) -> Tensor:
 
     if t2.requires_grad:
         def grad_fn2(grad: np.ndarray) -> np.ndarray:
-            # Sum out added dims
+            # sum out added dims
             ndims_added = grad.ndim - t2.ndim
             for _ in range(ndims_added):
                 grad = grad.sum(axis=0)
 
-            # Sum across broadcasted (but non-added dims)
+            # sum across broadcasted (but non-added dims)
             for i, dim in enumerate(t2.shape):
                 if dim == 1:
                     grad = grad.sum(axis=i, keepdims=True)
@@ -240,12 +258,12 @@ def t_mul(t1: Tensor, t2: Tensor) -> Tensor:
             # chain rule
             grad = grad * t2.data
 
-            # Sum out added dims
+            # sum out added dims
             ndims_added = grad.ndim - t1.ndim
             for _ in range(ndims_added):
                 grad = grad.sum(axis=0)
 
-            # Sum across broadcasted (but non-added dims)
+            # sum across broadcasted (but non-added dims)
             for i, dim in enumerate(t1.shape):
                 if dim == 1:
                     grad = grad.sum(axis=i, keepdims=True)
@@ -259,12 +277,62 @@ def t_mul(t1: Tensor, t2: Tensor) -> Tensor:
             # chain rule
             grad = grad * t1.data
 
-            # Sum out added dims
+            # sum out added dims
             ndims_added = grad.ndim - t2.ndim
             for _ in range(ndims_added):
                 grad = grad.sum(axis=0)
 
-            # Sum across broadcasted (but non-added dims)
+            # sum across broadcasted (but non-added dims)
+            for i, dim in enumerate(t2.shape):
+                if dim == 1:
+                    grad = grad.sum(axis=i, keepdims=True)
+
+            return grad
+
+        depends_on.append(Dependency(t2, grad_fn2))
+
+    return Tensor(
+            data,
+            requires_grad,
+            depends_on)
+
+
+def t_div(t1: Tensor, t2: Tensor) -> Tensor:
+    data = t1.data / t2.data
+    requires_grad: bool = t1.requires_grad or t2.requires_grad
+
+    depends_on: List[Dependency] = []
+
+    if t1.requires_grad:
+        def grad_fn1(grad: np.ndarray) -> np.ndarray:
+            # chain rule
+            grad = grad * (1 / t2.data)
+
+            # sum out added dims
+            ndims_added = grad.ndim - t1.ndim
+            for _ in range(ndims_added):
+                grad = grad.sum(axis=0)
+
+            # sum across broadcasted (but non-added dims)
+            for i, dim in enumerate(t1.shape):
+                if dim == 1:
+                    grad = grad.sum(axis=i, keepdims=True)
+
+            return grad
+
+        depends_on.append(Dependency(t1, grad_fn1))
+
+    if t2.requires_grad:
+        def grad_fn2(grad: np.ndarray) -> np.ndarray:
+            # chain rule
+            grad = grad * t1.data * (-1 / t2.data**2)
+
+            # sum out added dims
+            ndims_added = grad.ndim - t2.ndim
+            for _ in range(ndims_added):
+                grad = grad.sum(axis=0)
+
+            # sum across broadcasted (but non-added dims)
             for i, dim in enumerate(t2.shape):
                 if dim == 1:
                     grad = grad.sum(axis=i, keepdims=True)

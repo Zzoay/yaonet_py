@@ -6,17 +6,17 @@ from yaonet.tensor import Tensor
 from yaonet.optimizers import SGD
 from yaonet.layers import Layer, Linear
 from yaonet.loss import MSE
-from yaonet.functions import sin
+from yaonet.functions import sin, sigmoid
 
-x_data = Tensor(np.random.randn(100, 3))
+x_data = Tensor(np.random.randn(5000, 3))
 coef1 = Tensor(np.array([[-1], [+3], [-2]], dtype=np.float))
 coef2 = Tensor(np.array([2]))
-y_data = sin((x_data @ coef1)) @ coef2 + 5
-y_data = y_data.reshape(100, 1)
+y_data = sigmoid((x_data @ coef1) @ coef2) + 5
+y_data = y_data.reshape(5000, 1)
 
 epochs = 100
 lr = 0.001
-batch_size = 32
+batch_size = 64
 input_shape = 3
 output_shape = 3
 
@@ -28,13 +28,13 @@ class Model(Layer):
         self.linear2 = Linear(output_shape, 1)
 
     def forward(self, inputs: Tensor) -> Tensor:
-        return self.linear2(sin(self.linear1(inputs)))
+        return self.linear2(sigmoid(self.linear1(inputs)))
 
-# model = Linear(input_shape, output_shape)
 model = Model(input_shape, output_shape)
 optimizer = SGD(module=model.parameters(for_optim=True), lr=lr)
-# optimizer = SGD(module=model.parameters, lr=lr)  # as same
+
 loss_func = MSE()
+
 
 if __name__ == "__main__":
     for epoch in range(epochs):
@@ -60,4 +60,4 @@ if __name__ == "__main__":
         print(f"Epoch {epoch}, loss: {epoch_loss},")
 
 predicted = model(x_data)
-print(*zip(predicted.tolist(), y_data.tolist()))
+print(loss_func(predicted, y_data).tolist() /400)
