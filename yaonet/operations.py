@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from yaonet.tensor import Dependency, Tensor, t_add, t_sub, t_mul, t_matmul, ensure_tensor
+from yaonet.tensor import Dependency, Tensor, t_add, t_sub, t_mul, t_matmul, t_div, ensure_tensor
 
 
 def add(t1: Tensor, t2: Tensor) -> Tensor:
@@ -14,6 +14,10 @@ def mul(t1: Tensor, t2: Tensor) -> Tensor:
 
 def sub(t1: Tensor, t2: Tensor) -> Tensor:
     return t_sub(ensure_tensor(t1), ensure_tensor(t2))
+
+
+def div(t1: Tensor, t2: Tensor) -> Tensor: 
+    return t_div(ensure_tensor(t1), ensure_tensor(t2))
 
 
 def matmul(t1: Tensor, t2: Tensor) -> Tensor:
