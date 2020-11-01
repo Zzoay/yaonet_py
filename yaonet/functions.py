@@ -1,4 +1,6 @@
 
+from typing import Union, Optional, Tuple
+
 import numpy as np
 
 from yaonet.tensor import Dependency, Tensor, ensure_tensor
@@ -160,3 +162,30 @@ def relu(t: Tensor) -> Tensor:
     return Tensor(data, 
             requires_grad,
             depends_on)
+
+
+def max_pool1d(t: Tensor, 
+               kernel_size: Union[Tensor, Tuple[Tensor, ...]], 
+               stride: Optional[Union[Tensor, Tuple[Tensor, ...]]] = None) -> Tensor:
+    if stride is None:
+        stride = kernel_size  # default
+
+    # t shape: batch size, channel, L_in
+    batch_size, channel, L_in = t.shape
+    assert channel == 1  # simply for NLP tasks
+    
+    idx_tensor = np.zeros((batch_size, channel, L_in))
+    for i in range(0, L_in, stride):
+        tmp = t[:, :, i:i + stride]
+        max_idx = np.argmax(tmp.data, axis=2).reshape(-1) + i 
+        for c in range(channel):
+            l = c*batch_size
+            h = (c+1)*batch_size
+            idx_tensor[list(range(batch_size)), c, max_idx.tolist()[l:h]] = 1
+
+    result = t[idx_tensor.astype(bool)].reshape(batch_size, channel, -1)
+    L_out = 1 + (L_in + - (kernel_size - 1) - 1 ) / stride
+    assert result.shape[2] == L_out
+    # result shape: batch size, channel, L_out
+
+    return result

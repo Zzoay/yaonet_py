@@ -98,8 +98,15 @@ class Tensor(BasicTensor):
     def reshape(self, *shape):
         return _reshape(self, *shape)
 
-    # def ravel(self):
-    #     return Tensor(self.data.ravel())
+    def squeeze(self, axis):
+        shape = list(self.shape)
+        shape.pop(axis)
+        return _reshape(self, shape)
+
+    def unsqueeze(self, axis):
+        shape = list(self.shape)
+        shape.insert(axis, 1)
+        return _reshape(self, shape)
 
     def __repr__(self) -> str:
         return f"Tensor({self.data}, requires_grad={self.requires_grad})"
