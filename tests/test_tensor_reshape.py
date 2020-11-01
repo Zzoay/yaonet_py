@@ -5,7 +5,8 @@ import pytest
 import numpy as np
 
 from yaonet.tensor import Tensor
-from yaonet.operations import matmul
+from yaonet.basic_functions import matmul
+
 
 class TestTensorAdd(unittest.TestCase):
     def test_tensor_reshape(self):

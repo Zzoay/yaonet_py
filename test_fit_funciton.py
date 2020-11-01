@@ -6,7 +6,7 @@ from yaonet.tensor import Tensor
 from yaonet.optimizers import SGD
 from yaonet.layers import Layer, Linear
 from yaonet.loss import MSE
-from yaonet.functions import sin, sigmoid
+from yaonet.basic_functions import sin, sigmoid
 
 x_data = Tensor(np.random.randn(5000, 3))
 coef1 = Tensor(np.array([[-1], [+3], [-2]], dtype=np.float))
