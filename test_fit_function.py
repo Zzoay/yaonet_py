@@ -3,7 +3,7 @@ import numpy as np
 
 from yaonet.module import Module
 from yaonet.tensor import Tensor
-from yaonet.optimizers import SGD
+from yaonet.optim import SGD
 from yaonet.layers import Layer, Linear, Conv2d, Embedding
 from yaonet.functional import sigmoid, relu, max_pool1d, mean_squared_error
 
