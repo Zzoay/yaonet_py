@@ -52,12 +52,12 @@ class Conv2d(Layer):
         self.stride = stride
         self.bias = bias
 
-        self.w = Parameter((kernel_size[0], kernel_size[1], in_channels, out_channels))
+        self.w = Parameter((self.kernel_size[0], self.kernel_size[1], in_channels, out_channels))
         if self.bias:
             self.b = Parameter((1, out_channels))
 
     def forward(self, inputs: Tensor) -> Tensor:
-        N, C, H, W  = inputs.shape
+        N, _, H, W  = inputs.shape   # N, C, H, W
         out_h = (H - self.kernel_size[0]) // self.stride + 1
         out_w = (W - self.kernel_size[1]) // self.stride + 1
 

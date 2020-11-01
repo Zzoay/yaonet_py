@@ -5,8 +5,7 @@ from yaonet.module import Module
 from yaonet.tensor import Tensor
 from yaonet.optimizers import SGD
 from yaonet.layers import Layer, Linear, Conv2d, Embedding
-from yaonet.loss import MSE
-from yaonet.functions import sin, sigmoid, relu, max_pool1d
+from yaonet.functional import sigmoid, relu, max_pool1d, mean_squared_error
 
 
 x_data = Tensor(np.random.randint(500, size=12000).reshape(2000, -1))
@@ -22,16 +21,16 @@ input_shape = 3
 output_shape = 3
 
 embed_dim = 30
-kernel_num = 1
-ksize = [1, 30]
+kernel_num = 2
+kernel_sizes =  [3]
 stride = 1
 
 
 class Model(Layer):
     def __init__(self, input_shape: int, output_shape: int) -> None:
         self.emb = Embedding(500, embed_dim)
-        self.conv = Conv2d(in_channels=1, out_channels=1, kernel_size=ksize, stride=stride)
-        self.linear1 = Linear(kernel_num*len(ksize), output_shape)
+        self.conv = Conv2d(in_channels=1, out_channels=kernel_num, kernel_size=(kernel_sizes[0], embed_dim), stride=stride)
+        self.linear1 = Linear(kernel_num*len(kernel_sizes), output_shape)
         self.linear2 = Linear(output_shape, 1)
 
     def forward(self, inputs: Tensor) -> Tensor:
@@ -40,8 +39,8 @@ class Model(Layer):
         emb_x = emb_x.reshape(batch_size, 1, sentence_length, embed_dim)
         
         conv_output = self.conv(emb_x)
-        h1 = relu(conv_output.reshape(batch_size, 1, sentence_length))
-        h2 = max_pool1d(h1, 3).squeeze(1)
+        h1 = relu(conv_output.squeeze(3))
+        h2 = max_pool1d(h1, h1.shape[2]).squeeze(2)
         h3 = sigmoid(self.linear1(h2))
         logits = self.linear2(h3)
         return logits
@@ -49,8 +48,6 @@ class Model(Layer):
 
 model = Model(input_shape, output_shape)
 optimizer = SGD(module=model.parameters(for_optim=True), lr=lr)
-
-loss_func = MSE()
 
 
 if __name__ == "__main__":
@@ -67,7 +64,7 @@ if __name__ == "__main__":
             y_batch = y_data[start:end]
 
             y_pred = model(x_batch)
-            loss = loss_func(y_pred, y_batch)
+            loss = mean_squared_error(y_pred, y_batch)
 
             loss.backward()
             epoch_loss += loss.data

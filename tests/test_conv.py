@@ -21,7 +21,7 @@ class TestConv(unittest.TestCase):
         stride = 1
 
         s = im2col(image, ksize, stride)
-        s.backward(np.array([1, 1, 1, 1, 1, 1]).reshape(6,1))
+        s.backward(np.ones(54).reshape(1, 6, 9))
         
         assert image.grad.shape == image.shape
 
@@ -31,4 +31,4 @@ class TestConv(unittest.TestCase):
 
         y = cnn(image)
 
-        y.backward(np.array([[1], [1], [1], [1], [1], [1]]))
+        y.backward(np.ones(6).reshape(1, 1, 2, 3))
