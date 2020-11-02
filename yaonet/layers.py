@@ -57,7 +57,7 @@ class Conv2d(Layer):
             self.b = Parameter((1, out_channels))
 
     def forward(self, inputs: Tensor) -> Tensor:
-        N, _, H, W  = inputs.shape   # N, C, H, W
+        N, _, H, W  = inputs.shape   # batch size, input channel, input height, input width
         out_h = (H - self.kernel_size[0]) // self.stride + 1
         out_w = (W - self.kernel_size[1]) // self.stride + 1
 
@@ -67,7 +67,7 @@ class Conv2d(Layer):
             output = col @ self.col_weights + self.b
         else:
             output = col @ self.col_weights
-        return output.reshape([N, self.out_channels, out_h, out_w])  # B, C, OH, OW
+        return output.reshape([N, self.out_channels, out_h, out_w])  # batch size, output channel, output height, output width
     
 
 def im2col(image: Tensor, ksize: Union[Tensor, Tuple[Tensor, Tensor]], stride: Union[Tensor, Tuple[Tensor, Tensor]] = 1):

@@ -62,7 +62,6 @@ class BasicTensor(object):
     def toarray(self):
         return self.data
 
-    # TODO
     def reshape(self, *shape):
         return BasicTensor(self.data.reshape(*shape))
 
@@ -76,14 +75,10 @@ class Tensor(BasicTensor):
                  data: Arrayable,
                  requires_grad: bool = False,
                  depends_on: List[Dependency] = []) -> None:
-        # self.data = ensure_array(data)
         super().__init__(data)
         self.requires_grad = requires_grad
         self.depends_on = depends_on
         self.grad: np.ndarray = None
-
-        # if self.requires_grad:
-        #     self.zero_grad()
       
     @property
     def data(self) -> np.ndarray:
@@ -98,14 +93,16 @@ class Tensor(BasicTensor):
     def reshape(self, *shape):
         return _reshape(self, *shape)
 
+    # TODO define backward pass
+    def ravel(self):
+        raise NotImplementedError
+
     def squeeze(self, axis):
-        shape = list(self.shape)
-        shape.pop(axis)
+        shape = list(self.shape).pop(axis)
         return _reshape(self, shape)
 
     def unsqueeze(self, axis):
-        shape = list(self.shape)
-        shape.insert(axis, 1)
+        shape = list(self.shape).insert(axis, 1)
         return _reshape(self, shape)
 
     def __repr__(self) -> str:
@@ -193,19 +190,11 @@ class Tensor(BasicTensor):
 
 
 def _sum(t: Tensor) -> Tensor:
-    """
-    Takes a tensor and returns the 0-tensor
-    that's the sum of all its elements.
-    """
     data: Tensor = t.data.sum()
     requires_grad: bool = t.requires_grad
 
     if requires_grad:
         def grad_fn(grad: np.ndarray) -> np.ndarray:
-            """
-            grad is necessarily a 0-tensor, so each input element
-            contributes that much
-            """
             # the gradient of function 'sum' is 1 to all elements
             return grad * np.ones_like(t.data)
 
@@ -378,7 +367,6 @@ def _sub(t1: Tensor, t2: Tensor) -> Tensor:
     return t1 + -t2
 
 
-# TODO unittest
 def _matmul(t1: Tensor, t2: Tensor) -> Tensor:
     t1shape = t1.shape
     t2shape = t2.shape
