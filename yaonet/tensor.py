@@ -98,11 +98,13 @@ class Tensor(BasicTensor):
         raise NotImplementedError
 
     def squeeze(self, axis):
-        shape = list(self.shape).pop(axis)
+        shape = list(self.shape)
+        shape.pop(axis)
         return _reshape(self, shape)
 
     def unsqueeze(self, axis):
-        shape = list(self.shape).insert(axis, 1)
+        shape = list(self.shape)
+        shape.insert(axis, 1)
         return _reshape(self, shape)
 
     def __repr__(self) -> str:
