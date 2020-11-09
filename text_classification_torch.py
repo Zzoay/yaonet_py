@@ -144,7 +144,7 @@ def train(train_iter, val_iter, test_iter, model, epochs):
 
 
 if __name__ == "__main__":
-    corpus = 'mr'
+    corpus = 'sst1'
 
     data_path = '{}/data.txt'.format(corpus)
     labels_path = '{}/labels.txt'.format(corpus)
