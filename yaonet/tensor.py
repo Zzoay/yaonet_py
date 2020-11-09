@@ -62,7 +62,6 @@ class BasicTensor(object):
     def toarray(self):
         return self.data
 
-    # TODO
     def reshape(self, *shape):
         return BasicTensor(self.data.reshape(*shape))
 
@@ -76,14 +75,10 @@ class Tensor(BasicTensor):
                  data: Arrayable,
                  requires_grad: bool = False,
                  depends_on: List[Dependency] = []) -> None:
-        # self.data = ensure_array(data)
         super().__init__(data)
         self.requires_grad = requires_grad
         self.depends_on = depends_on
         self.grad: np.ndarray = None
-
-        # if self.requires_grad:
-        #     self.zero_grad()
       
     @property
     def data(self) -> np.ndarray:
@@ -98,8 +93,19 @@ class Tensor(BasicTensor):
     def reshape(self, *shape):
         return _reshape(self, *shape)
 
-    # def ravel(self):
-    #     return Tensor(self.data.ravel())
+    # TODO define backward pass
+    def ravel(self):
+        raise NotImplementedError
+
+    def squeeze(self, axis):
+        shape = list(self.shape)
+        shape.pop(axis)
+        return _reshape(self, shape)
+
+    def unsqueeze(self, axis):
+        shape = list(self.shape)
+        shape.insert(axis, 1)
+        return _reshape(self, shape)
 
     def __repr__(self) -> str:
         return f"Tensor({self.data}, requires_grad={self.requires_grad})"
@@ -108,15 +114,15 @@ class Tensor(BasicTensor):
         self.grad = np.zeros_like(self.data, dtype=np.float64)
 
     def sum(self) -> 'Tensor':
-        return t_sum(self)
+        return _sum(self)
 
     # t + other
     def __add__(self, other) -> 'Tensor':
-        return t_add(self, ensure_tensor(other))
+        return _add(self, ensure_tensor(other))
 
     # other + t
     def __radd__(self, other) :
-        return t_add(ensure_tensor(other), self)
+        return _add(ensure_tensor(other), self)
     
     # t = t + other
     def __iadd__(self, other):
@@ -124,36 +130,36 @@ class Tensor(BasicTensor):
         return self
 
     def __mul__(self, other):
-        return t_mul(self, ensure_tensor(other))
+        return _mul(self, ensure_tensor(other))
     
     def __rmul__(self, other) :
-        return t_mul(ensure_tensor(other), self)
+        return _mul(ensure_tensor(other), self)
     
     def __imul__(self, other):
         self.data = self.data * ensure_tensor(other).data
         return self
 
     def __neg__(self):
-        return t_neg(self)
+        return _neg(self)
 
     def __sub__(self, other):
-        return t_sub(self, ensure_tensor(other))
+        return _sub(self, ensure_tensor(other))
     
     def __rsub__(self, other):
-        return t_sub(ensure_tensor(other), self)
+        return _sub(ensure_tensor(other), self)
 
     def __isub__(self, other):
         self.data = self.data - ensure_tensor(other).data
         return self
 
     def __matmul__(self, other):
-        return t_matmul(self, ensure_tensor(other))
+        return _matmul(self, ensure_tensor(other))
 
     def __truediv__(self, other):
-        return t_div(self, ensure_tensor(other))
+        return _div(self, ensure_tensor(other))
 
     def __rtruediv__(self, other):
-        return t_div(ensure_tensor(other), self)
+        return _div(ensure_tensor(other), self)
     
     def __itruediv__(self, other):        
         self.data = self.data / ensure_tensor(other).data
@@ -185,20 +191,12 @@ class Tensor(BasicTensor):
             dependency.tensor.backward(backward_grad)
 
 
-def t_sum(t: Tensor) -> Tensor:
-    """
-    Takes a tensor and returns the 0-tensor
-    that's the sum of all its elements.
-    """
+def _sum(t: Tensor) -> Tensor:
     data: Tensor = t.data.sum()
     requires_grad: bool = t.requires_grad
 
     if requires_grad:
         def grad_fn(grad: np.ndarray) -> np.ndarray:
-            """
-            grad is necessarily a 0-tensor, so each input element
-            contributes that much
-            """
             # the gradient of function 'sum' is 1 to all elements
             return grad * np.ones_like(t.data)
 
@@ -212,7 +210,7 @@ def t_sum(t: Tensor) -> Tensor:
                   depends_on)
 
 
-def t_add(t1: Tensor, t2: Tensor) -> Tensor:
+def _add(t1: Tensor, t2: Tensor) -> Tensor:
     data: Tensor = t1.data + t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
@@ -255,7 +253,7 @@ def t_add(t1: Tensor, t2: Tensor) -> Tensor:
                   depends_on)
 
 
-def t_mul(t1: Tensor, t2: Tensor) -> Tensor:
+def _mul(t1: Tensor, t2: Tensor) -> Tensor:
     data: Tensor = t1.data * t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
@@ -305,7 +303,7 @@ def t_mul(t1: Tensor, t2: Tensor) -> Tensor:
             depends_on)
 
 
-def t_div(t1: Tensor, t2: Tensor) -> Tensor:
+def _div(t1: Tensor, t2: Tensor) -> Tensor:
     data = t1.data / t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
@@ -355,7 +353,7 @@ def t_div(t1: Tensor, t2: Tensor) -> Tensor:
             depends_on)
 
 
-def t_neg(t: Tensor) -> Tensor:
+def _neg(t: Tensor) -> Tensor:
     data = -t.data
     requires_grad = t.requires_grad
 
@@ -367,12 +365,11 @@ def t_neg(t: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
-def t_sub(t1: Tensor, t2: Tensor) -> Tensor:
+def _sub(t1: Tensor, t2: Tensor) -> Tensor:
     return t1 + -t2
 
 
-# TODO unittest
-def t_matmul(t1: Tensor, t2: Tensor) -> Tensor:
+def _matmul(t1: Tensor, t2: Tensor) -> Tensor:
     t1shape = t1.shape
     t2shape = t2.shape
 
@@ -413,7 +410,7 @@ def t_matmul(t1: Tensor, t2: Tensor) -> Tensor:
 
 
 # TODO unittest
-def t_tensordot(t1: Tensor, t2: Tensor, dims: Union[int, Tuple[List[int]]]) -> Tensor:
+def _tensordot(t1: Tensor, t2: Tensor, dims: Union[int, Tuple[List[int]]]) -> Tensor:
     t1shape = list(t1.shape)
     t2shape = list(t2.shape)
 

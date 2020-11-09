@@ -5,7 +5,7 @@ import pytest
 import numpy as np
 
 from yaonet.tensor import Tensor
-from yaonet.functions import *
+from yaonet.basic_functions import *
 
 
 class TestTensorBscFunstion(unittest.TestCase):

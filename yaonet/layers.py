@@ -41,23 +41,25 @@ class Conv2d(Layer):
     def __init__(self,
                 in_channels: int, 
                 out_channels: int, 
-                kernel_size: Union[Tensor, Tuple[Tensor, Tensor]], 
-                stride: Union[Tensor, Tuple[Tensor, Tensor]] = 1,
+                kernel_size: Union[int, Tuple[int, int]], 
+                stride: Union[int, Tuple[int, int]] = 1,
                 bias: bool = True) -> None:          
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
+        if isinstance(kernel_size, int):
+            self.kernel_size = [kernel_size, kernel_size]
         self.stride = stride
         self.bias = bias
 
-        self.w = Parameter((kernel_size, kernel_size, in_channels, out_channels))
+        self.w = Parameter((self.kernel_size[0], self.kernel_size[1], in_channels, out_channels))
         if self.bias:
             self.b = Parameter((1, out_channels))
 
     def forward(self, inputs: Tensor) -> Tensor:
-        N, C, H, W  = inputs.shape
-        out_h = (H - self.kernel_size) // self.stride + 1
-        out_w = (W - self.kernel_size) // self.stride + 1
+        N, _, H, W  = inputs.shape   # batch size, input channel, input height, input width
+        out_h = (H - self.kernel_size[0]) // self.stride + 1
+        out_w = (W - self.kernel_size[1]) // self.stride + 1
 
         self.col_weights = self.w.reshape([-1, self.out_channels])
         col = im2col(inputs, self.kernel_size, self.stride)
@@ -65,20 +67,24 @@ class Conv2d(Layer):
             output = col @ self.col_weights + self.b
         else:
             output = col @ self.col_weights
-        return output.reshape([N, self.out_channels, out_h, out_w])  # B, C, OH, OW
+        return output.reshape([N, self.out_channels, out_h, out_w])  # batch size, output channel, output height, output width
     
 
-#TODO fix for the batch condition
-def im2col(image, ksize, stride):
+def im2col(image: Tensor, ksize: Union[Tensor, Tuple[Tensor, Tensor]], stride: Union[Tensor, Tuple[Tensor, Tensor]] = 1):
     batchsize, channel, height, width= image.shape
 
+    ksize1 = ksize
+    ksize2 = ksize
+    if isinstance(ksize, (tuple,list)) and len(ksize) == 2:    
+        ksize1, ksize2 = ksize
+
     image_col = []
-    for i in range(0, height - ksize + 1, stride):
-        for j in range(0, width - ksize + 1, stride):
-            col = image[:, :, i:i + ksize, j:j + ksize].data.reshape(batchsize, channel, -1)
+    for i in range(0, height - ksize1 + 1, stride):
+        for j in range(0, width - ksize2 + 1, stride):
+            col = image[:, :, i:i + ksize1, j:j + ksize2].data.reshape(batchsize, channel, -1)
             image_col.append(col)
     image_col = np.array(image_col)
-    image_col = image_col.reshape(*(image_col.shape[:2]), -1).transpose(1,0,2)
+    image_col = image_col.reshape(*list(image_col.shape)[:2], -1).transpose(1,0,2)
 
     requires_grad = image.requires_grad
     if requires_grad:
@@ -86,9 +92,9 @@ def im2col(image, ksize, stride):
             new_grad = np.zeros((batchsize, channel, height, width))
             
             cnt = 0
-            for i in range(0, height - ksize + 1, stride):
-                for j in range(0, width - ksize + 1, stride):
-                    new_grad[:, :, i:i + ksize, j:j + ksize] += grad[:, cnt, :].reshape(batchsize, channel, ksize, ksize)
+            for i in range(0, height - ksize1 + 1, stride):
+                for j in range(0, width - ksize2 + 1, stride):
+                    new_grad[:, :, i:i + ksize1, j:j + ksize2] += grad[:, cnt, :].reshape(batchsize, channel, ksize1, ksize2)
                     cnt += 1
             return new_grad
 
@@ -110,7 +116,7 @@ class Embedding(Layer):
     def forward(self, inputs: Tensor) -> Tensor:
         #  inputs.shape: batch_size, sentence_length
 
-        emb = []  #TODO batch_size, sentence_length, embedding_dim
+        emb = []  # batch_size, sentence_length, embedding_dim
         for item in inputs:
             emb.append(self.weights[item.tolist()].toarray())
 
