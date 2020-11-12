@@ -1,11 +1,13 @@
 
 import numpy as np
 
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 
 from yaonet.module import Module
 from yaonet.parameter import Parameter
 from yaonet.tensor import Tensor, Dependency
+from yaonet.functional import sigmoid, tanh
+from yaonet.utils import cat
 
 
 class Layer(Module):
@@ -149,18 +151,141 @@ class RNN(Layer):
     def forward(self, inputs: Tensor) -> Tensor:
         raise NotImplementedError
 
+# previous version
+class LSTM_(Layer):
+    def __init__(self, 
+                 input_size: int, 
+                 hidden_size: int,
+                 num_layers: int = 1, 
+                 bias: bool = True) -> None:
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
+        
+        self.i_input_weights = Parameter((input_size, hidden_size))
+        self.i_forget_weights = Parameter((input_size, hidden_size))
+        self.i_cell_weights = Parameter((input_size, hidden_size))
+        self.i_output_weights = Parameter((input_size, hidden_size))
+
+        self.h_input_weights = Parameter((hidden_size, hidden_size))
+        self.h_forget_weights = Parameter((hidden_size, hidden_size))
+        self.h_cell_weights = Parameter((hidden_size, hidden_size))
+        self.h_output_weights = Parameter((hidden_size, hidden_size))
+
+        assert bias, "In nlp tasks, bias usually exists"
+        self.i_input_bias = Parameter((1, hidden_size))
+        self.i_forget_bias = Parameter((1, hidden_size))
+        self.i_cell_bias = Parameter((1, hidden_size))
+        self.i_output_bias = Parameter((1, hidden_size))
+
+        self.h_input_bias = Parameter((1, hidden_size))
+        self.h_forget_bias = Parameter((1, hidden_size))
+        self.h_cell_bias = Parameter((1, hidden_size))
+        self.h_output_bias = Parameter((1, hidden_size))
+
+    def forward(self, inputs: Tensor, hc_0: Optional[Tuple[Tensor, Tensor]] = None) -> Tensor:
+        # default batch first
+        # input shape: (batch_size, seq_length, input_size)
+        batch_size, seq_length, input_size = inputs.shape
+        if hc_0:
+            h_t, c_t = hc_0
+        else:
+            h_t = Tensor(np.zeros((batch_size, self.num_layers, self.hidden_size)))
+            c_t = Tensor(np.zeros((batch_size, self.num_layers, self.hidden_size)))
+
+        h_lst = []
+        for i in range(seq_length):
+            x_t = inputs[:, i, :].unsqueeze(1)
+            
+            i_t = sigmoid(x_t @ self.i_input_weights + self.i_input_bias + h_t @ self.h_input_weights + self.h_input_bias)
+            f_t = sigmoid(x_t @ self.i_forget_weights + self.i_forget_bias + h_t @ self.h_forget_weights + self.h_forget_bias)
+            g_t = tanh(x_t @ self.i_cell_weights + self.i_cell_bias + h_t @ self.h_cell_weights + self.h_cell_bias)
+            o_t = sigmoid(x_t @ self.i_output_weights + self.i_output_bias + h_t @ self.h_output_weights + self.h_output_bias)
+
+            c_t = f_t * c_t + i_t * g_t
+            h_t = o_t * tanh(c_t)
+            
+            h_lst.append(h_t)
+        
+        outputs = cat(h_lst, axis=1)
+
+        # output_shape: (batch_size, seq_length, hidden_size)
+        assert outputs.shape == (batch_size, seq_length, self.hidden_size)
+        assert h_t.shape == (batch_size, self.num_layers, self.hidden_size)
+        assert c_t.shape == (batch_size, self.num_layers, self.hidden_size)
+
+        return outputs, (h_t, c_t)
+
 
 class LSTM(Layer):
-    def __init__(self, input_shape: int, output_shape: int) -> None:
-        super().__init__(input_shape, output_shape)
+    def __init__(self, 
+                 input_size: int, 
+                 hidden_size: int,
+                 num_layers: int = 1, 
+                 bias: bool = True) -> None:
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
 
-    def forward(self, inputs: Tensor) -> Tensor:
-        raise NotImplementedError
+        self.input_weights = Parameter((input_size + hidden_size, hidden_size))
+        self.forget_weights = Parameter((input_size + hidden_size, hidden_size))
+        self.cell_weights = Parameter((input_size + hidden_size, hidden_size))
+        self.output_weights = Parameter((input_size + hidden_size, hidden_size))
+
+        if bias:
+            self.input_bias = Parameter((1, hidden_size))
+            self.forget_bias = Parameter((1, hidden_size))
+            self.cell_bias = Parameter((1, hidden_size))
+            self.output_bias = Parameter((1, hidden_size))
+
+    def forward(self, inputs: Tensor, hc_0: Optional[Tuple[Tensor, Tensor]] = None) -> Tensor:
+        # default batch first
+        # input shape: (batch_size, seq_length, input_size)
+        batch_size, seq_length, _input_size = inputs.shape
+        # h_t is the hidden state at time t, c_t is the cell state at time t; if (h_0, c_0) is not provided, both h_0 and c_0 default to zero.
+        if hc_0:
+            h_t, c_t = hc_0
+        else:
+            h_t = Tensor(np.zeros((batch_size, self.num_layers, self.hidden_size)))
+            c_t = Tensor(np.zeros((batch_size, self.num_layers, self.hidden_size)))
+
+        h_lst = []
+        for i in range(seq_length):
+            x_t = inputs[:, i, :].unsqueeze(1)
+            xh_t = cat((x_t, h_t), axis=2)
+
+            if self.bias:
+                # i_t, f_t, g_t, o_t are the input, forget, cell, and output gates
+                i_t = sigmoid(xh_t @ self.input_weights + self.input_bias)
+                f_t = sigmoid(xh_t @ self.forget_weights + self.forget_bias)
+                g_t = tanh(xh_t @ self.cell_weights + self.cell_bias)
+                o_t = sigmoid(xh_t @ self.output_weights + self.output_bias)
+            else:
+                i_t = sigmoid(xh_t @ self.input_weights)
+                f_t = sigmoid(xh_t @ self.forget_weights)
+                g_t = tanh(xh_t @ self.cell_weights)
+                o_t = sigmoid(xh_t @ self.output_weights)
+
+            c_t = f_t * c_t + i_t * g_t
+            h_t = o_t * tanh(c_t)
+            
+            h_lst.append(h_t)
+        
+        outputs = cat(h_lst, axis=1)
+        
+        # output_shape: (batch_size, seq_length, hidden_size)
+        assert outputs.shape == (batch_size, seq_length, self.hidden_size)
+        assert h_t.shape == (batch_size, self.num_layers, self.hidden_size)
+        assert c_t.shape == (batch_size, self.num_layers, self.hidden_size)
+
+        return outputs, (h_t, c_t)
 
 
 class GRU(Layer):
     def __init__(self, input_shape: int, output_shape: int) -> None:
         super().__init__(input_shape, output_shape)
 
-    def forward(self, inputs: Tensor) -> Tensor:
+    def forward(self, inputs: Tensor) -> Tensor:  
         raise NotImplementedError
