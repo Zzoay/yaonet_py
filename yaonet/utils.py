@@ -1,5 +1,5 @@
 
-from typing import Tuple
+from typing import Tuple, Union, Iterable
 
 import numpy as np
 
@@ -65,3 +65,11 @@ def cat(ts: Tuple[Tensor], axis: int) -> Tensor:
     del _data
 
     return Tensor(data, requires_grad, depends_on)
+
+
+def clip_grad_value(parameters: Union[Tensor, Iterable[Tensor]], 
+                    clip_value: float) -> None:
+    assert clip_value > 0, "clip_value must be > 0"
+    for parameter in parameters:
+        parameter.grad = np.clip(parameter.grad, -clip_value, clip_value)
+    return

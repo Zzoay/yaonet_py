@@ -6,6 +6,7 @@ from yaonet.tensor import Tensor
 from yaonet.optim import SGD
 from yaonet.layers import Layer, Linear, Conv2d, Embedding
 from yaonet.functional import sigmoid, relu, max_pool1d, mean_squared_error
+from yaonet.utils import clip_grad_value
 
 
 x_data = Tensor(np.random.randint(500, size=12000).reshape(2000, -1))
@@ -69,6 +70,7 @@ if __name__ == "__main__":
             loss.backward()
             epoch_loss += loss.data
 
+            clip_grad_value(model.parameters(), clip_value=10)
             optimizer.step()
 
         print(f"Epoch {epoch}, loss: {epoch_loss},")

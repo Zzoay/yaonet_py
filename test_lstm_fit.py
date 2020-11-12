@@ -3,10 +3,11 @@ import numpy as np
 
 import time
 
-from yaonet.layers import LSTM2, Linear, Layer
+from yaonet.layers import LSTM, Linear, Layer
 from yaonet.tensor import Tensor
 from yaonet.functional import sigmoid, relu, max_pool1d, mean_squared_error
 from yaonet.optim import SGD
+from yaonet.utils import clip_grad_value
 
 s_time = time.time()
 
@@ -22,7 +23,7 @@ lr = 0.001
 
 class Model(Layer):
     def __init__(self, input_shape: int, output_shape: int) -> None:
-        self.lstm = LSTM2(input_size=10, hidden_size=10)
+        self.lstm = LSTM(input_size=10, hidden_size=10)
         self.linear = Linear(10, 1)
 
     def forward(self, inputs: Tensor) -> Tensor:
@@ -40,6 +41,7 @@ optimizer = SGD(module=model.parameters(for_optim=True), lr=lr)
 
 
 if __name__ == "__main__":
+    step = 0
     for epoch in range(epochs):
         epoch_loss = 0.0
 
@@ -54,12 +56,17 @@ if __name__ == "__main__":
 
             y_pred = model(x_batch)
             loss = mean_squared_error(y_pred, y_batch)
-            print(f"Loss: {loss}")
+
+            if step % 10 == 0:
+                print(f"Step: {step}, loss: {loss}")
 
             loss.backward()
             epoch_loss += loss.data
 
+            clip_grad_value(model.parameters(), clip_value=10)
             optimizer.step()
+
+            step += 1
 
         print(f"Epoch {epoch}, loss: {epoch_loss},")
 
