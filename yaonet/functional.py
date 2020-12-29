@@ -49,7 +49,8 @@ def max_pool1d(t: Tensor,
 
     # t shape: batch size, channel, L_in
     batch_size, channel, L_in = t.shape
-    
+    assert kernel_size <= L_in, "kernel_size must be less than L_in"
+
     idx_tensor = np.zeros((batch_size, channel, L_in))
     for i in range(0, L_in, stride):
         tmp = t[:, :, i:i + stride]
