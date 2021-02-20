@@ -1,4 +1,5 @@
 
+import time 
 import numpy as np
 
 from yaonet.module import Module
@@ -9,6 +10,7 @@ from yaonet.functional import sigmoid, relu, max_pool1d, mean_squared_error
 from yaonet.utils import clip_grad_value
 
 
+# random data
 x_data = Tensor(np.random.randint(500, size=12000).reshape(2000, -1))
 coef1 = Tensor(np.array([[-1], [+3], [-2], [1], [+4], [2]], dtype=np.float))
 coef2 = Tensor(np.array([2]))
@@ -52,6 +54,7 @@ optimizer = SGD(module=model.parameters(for_optim=True), lr=lr)
 
 
 if __name__ == "__main__":
+    t = time.time()
     for epoch in range(epochs):
         epoch_loss = 0.0
 
@@ -79,3 +82,5 @@ predicted = model(x_data)
 # print(*zip(predicted.tolist(), y_data.tolist()))
 rmse = np.sqrt((predicted - y_data).data**2).mean()
 print(rmse)
+
+print(f"time cost: {time.time() - t} s")

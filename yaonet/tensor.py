@@ -8,7 +8,7 @@ class Dependency():
     def __init__(self, 
                  tensor:'Tensor',
                  grad_fn: Callable[[np.ndarray], np.ndarray]) -> None: 
-        self.tensor = tensor
+        self.tensor = tensor   # it is essentially a reference 
         self.grad_fn = grad_fn
 
 
@@ -442,6 +442,7 @@ def _tensordot(t1: Tensor, t2: Tensor, dims: Union[int, Tuple[List[int]]]) -> Te
                   depends_on)
 
 
+# TODO return as a view like numpy.ndarray (possibly difficult)
 def _slice(t: Tensor, idxs: Union[int, List[int]]) -> Tensor:
     data = t.data[idxs]
     requires_grad = t.requires_grad
@@ -460,6 +461,7 @@ def _slice(t: Tensor, idxs: Union[int, List[int]]) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
+# TODO return as a view like numpy.ndarray (possibly difficult)
 def _reshape(t: Tensor, *shape):
     pre_shape = t.shape
 
