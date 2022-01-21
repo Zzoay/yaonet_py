@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from typing import List, Callable, Union, Tuple
+from typing import List, Callable, Union, Tuple, Optional
 
 
 class Dependency():
@@ -12,7 +12,7 @@ class Dependency():
         self.grad_fn = grad_fn
 
 
-Arrayable = Union[float, list, np.ndarray]
+Arrayable = Union[float, list, np.ndarray, 'Tensor']
 
 def ensure_array(arrayable: Arrayable) -> np.ndarray:
     if isinstance(arrayable, np.ndarray):
@@ -21,13 +21,7 @@ def ensure_array(arrayable: Arrayable) -> np.ndarray:
         return np.array(arrayable)
 
 
-Tensorable = Union['BasicTensor', 'Tensor', float, np.ndarray]
-
-def ensure_basicTensor(tensorable: Tensorable) -> 'Tensor':
-    if isinstance(tensorable, BasicTensor):
-        return tensorable
-    else:
-        return BasicTensor(tensorable)
+Tensorable = Union['Tensor', float, np.ndarray]
 
 
 def ensure_tensor(tensorable: Tensorable) -> 'Tensor':
@@ -37,13 +31,19 @@ def ensure_tensor(tensorable: Tensorable) -> 'Tensor':
         return Tensor(tensorable)
 
 
-# make a basic class of tensor, only with data and some func about data, then the "Tensor" class extends it.
-class BasicTensor(object):
-    def __init__(self, 
-                 data: Arrayable) -> None:
+# a tensor includes data and dependency info.
+class Tensor():
+    def __init__(self,
+                 data: Arrayable,
+                 requires_grad: bool = False,
+                 depends_on: List[Dependency] = []) -> None:
         self._data = ensure_array(data)
         self.shape = self._data.shape
         self.ndim = self._data.ndim
+
+        self.requires_grad = requires_grad
+        self.depends_on = depends_on
+        self.grad: Optional[np.ndarray] = None
       
     @property
     def data(self) -> np.ndarray:
@@ -52,46 +52,17 @@ class BasicTensor(object):
     @data.setter
     def data(self, new_data: np.ndarray) -> None:
         self._data = new_data
+        # set a tensor means that its grad should become None.
+        self.grad = None
 
-    def __repr__(self) -> str:
-        return f"Basic Tensor({self.data})"
+    def reshape(self, *shape):
+        return _reshape(self, *shape)
 
     def tolist(self):
         return self.data.tolist()
 
     def toarray(self):
         return self.data
-
-    def reshape(self, *shape):
-        return BasicTensor(self.data.reshape(*shape))
-
-    def ravel(self):
-        return BasicTensor(self.data.ravel())
-
-
-# a tensor includes data and dependency info.
-class Tensor(BasicTensor):
-    def __init__(self,
-                 data: Arrayable,
-                 requires_grad: bool = False,
-                 depends_on: List[Dependency] = []) -> None:
-        super().__init__(data)
-        self.requires_grad = requires_grad
-        self.depends_on = depends_on
-        self.grad: np.ndarray = None
-      
-    @property
-    def data(self) -> np.ndarray:
-        return super().data
-
-    @data.setter
-    def data(self, new_data: np.ndarray) -> None:
-        super(Tensor, Tensor).data.__set__(self, new_data)
-        # set a tensor means that its grad should become None.
-        self.grad = None
-
-    def reshape(self, *shape):
-        return _reshape(self, *shape)
 
     # TODO define backward pass
     def ravel(self):
@@ -102,7 +73,7 @@ class Tensor(BasicTensor):
         shape.pop(axis)
         return _reshape(self, shape)
 
-    def unsqueeze(self, axis):
+    def unsqueeze(self, axis) -> 'Tensor':
         shape = list(self.shape)
         shape.insert(axis, 1)
         return _reshape(self, shape)
@@ -410,7 +381,7 @@ def _matmul(t1: Tensor, t2: Tensor) -> Tensor:
 
 
 # TODO unittest
-def _tensordot(t1: Tensor, t2: Tensor, dims: Union[int, Tuple[List[int]]]) -> Tensor:
+def _tensordot(t1: Tensor, t2: Tensor, dims: Tuple[List[int], ...]) -> Tensor:
     t1shape = list(t1.shape)
     t2shape = list(t2.shape)
 
@@ -419,7 +390,7 @@ def _tensordot(t1: Tensor, t2: Tensor, dims: Union[int, Tuple[List[int]]]) -> Te
 
     partition = len(t1od)
 
-    data = np.tensordot(t1.data, t2.data, dims)
+    data = np.tensordot(t1.data, t2.data, dims)  # type: ignore
     dshape = list(data.shape)
 
     requires_grad = t1.requires_grad or t2.requires_grad

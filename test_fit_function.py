@@ -12,7 +12,7 @@ from yaonet.utils import clip_grad_value
 
 # random data
 x_data = Tensor(np.random.randint(500, size=12000).reshape(2000, -1))
-coef1 = Tensor(np.array([[-1], [+3], [-2], [1], [+4], [2]], dtype=np.float))
+coef1 = Tensor(np.array([[-1], [+3], [-2], [1], [+4], [2]], dtype=np.float_))
 coef2 = Tensor(np.array([2]))
 y_data = (x_data/500 @ coef1) @ coef2 + 5
 y_data = y_data.reshape(2000, 1)
@@ -50,7 +50,7 @@ class Model(Layer):
 
 
 model = Model(input_shape, output_shape)
-optimizer = SGD(module=model.parameters(for_optim=True), lr=lr)
+optimizer = SGD(params=model.parameters(for_optim=True), lr=lr)
 
 
 if __name__ == "__main__":
@@ -71,7 +71,7 @@ if __name__ == "__main__":
             loss = mean_squared_error(y_pred, y_batch)
 
             loss.backward()
-            epoch_loss += loss.data
+            epoch_loss += float(loss.data)
 
             clip_grad_value(model.parameters(), clip_value=10)
             optimizer.step()

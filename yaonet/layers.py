@@ -15,13 +15,13 @@ class Layer(Module):
         self.input_shape = input_shape
         self.output_shape = output_shape
 
-    def forward(self, inputs: Tensor) -> Tensor:
+    def forward(self, inputs: Tensor):
         raise NotImplementedError
 
-    def predict(self, inputs: Tensor) -> Tensor:
+    def predict(self, inputs: Tensor):
         return self.forward(inputs)
 
-    def __call__(self, inputs: Tensor) -> Tensor:
+    def __call__(self, inputs: Tensor):
         return self.forward(inputs)
 
 
@@ -44,13 +44,14 @@ class Conv2d(Layer):
                 in_channels: int, 
                 out_channels: int, 
                 kernel_size: Union[int, Tuple[int, int]], 
-                stride: Union[int, Tuple[int, int]] = 1,
+                stride: int = 1,  # TODO: stride could be a tuple
                 bias: bool = True) -> None:          
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.kernel_size = kernel_size
         if isinstance(kernel_size, int):
-            self.kernel_size = [kernel_size, kernel_size]
+            self.kernel_size = (kernel_size, kernel_size)
+        else:
+            self.kernel_size = kernel_size          
         self.stride = stride
         self.bias = bias
 
@@ -72,21 +73,21 @@ class Conv2d(Layer):
         return output.reshape([N, self.out_channels, out_h, out_w])  # batch size, output channel, output height, output width
     
 
-def im2col(image: Tensor, ksize: Union[Tensor, Tuple[Tensor, Tensor]], stride: Union[Tensor, Tuple[Tensor, Tensor]] = 1):
+def im2col(image: Tensor, ksize: Tuple[int, int], stride: int = 1):
     batchsize, channel, height, width= image.shape
 
-    ksize1 = ksize
-    ksize2 = ksize
+    # ksize1 = ksize
+    # ksize2 = ksize
     if isinstance(ksize, (tuple,list)) and len(ksize) == 2:    
-        ksize1, ksize2 = ksize
+        ksize1, ksize2 = ksize[0], ksize[1]
 
     image_col = []
     for i in range(0, height - ksize1 + 1, stride):
         for j in range(0, width - ksize2 + 1, stride):
             col = image[:, :, i:i + ksize1, j:j + ksize2].data.reshape(batchsize, channel, -1)
             image_col.append(col)
-    image_col = np.array(image_col)
-    image_col = image_col.reshape(*list(image_col.shape)[:2], -1).transpose(1,0,2)
+    image_col = np.array(image_col)  # type: ignore
+    image_col = image_col.reshape(*list(image_col.shape)[:2], -1).transpose(1,0,2)  # type: ignore
 
     requires_grad = image.requires_grad
     if requires_grad:
@@ -119,7 +120,7 @@ class Embedding(Layer):
         #  inputs.shape: batch_size, sentence_length
 
         emb = []  # batch_size, sentence_length, embedding_dim
-        for item in inputs:
+        for item in inputs[:]:
             emb.append(self.weights[item.tolist()].toarray())
 
         requires_grad = True
@@ -131,9 +132,9 @@ class Embedding(Layer):
                 if self.weights.grad is None:
                     self.weights.zero_grad()
                 pre_grad = self.weights.grad
-                for i,item in enumerate(inputs):
-                    pre_grad[item.tolist()] += grad[i, :, :]
-                return pre_grad
+                for i,item in enumerate(inputs[:]):
+                    pre_grad[item.tolist()] += grad[i, :, :]  # type: ignore
+                return pre_grad   # type: ignore
 
             depends_on = [Dependency(self.weights, grad_fn)]
         else:
@@ -184,7 +185,7 @@ class LSTM_(Layer):
         self.h_cell_bias = Parameter((1, hidden_size))
         self.h_output_bias = Parameter((1, hidden_size))
 
-    def forward(self, inputs: Tensor, hc_0: Optional[Tuple[Tensor, Tensor]] = None) -> Tensor:
+    def forward(self, inputs: Tensor, hc_0: Optional[Tuple[Tensor, Tensor]] = None) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
         # default batch first
         # input shape: (batch_size, seq_length, input_size)
         batch_size, seq_length, input_size = inputs.shape
@@ -240,7 +241,7 @@ class LSTM(Layer):
             self.cell_bias = Parameter((1, hidden_size))
             self.output_bias = Parameter((1, hidden_size))
 
-    def forward(self, inputs: Tensor, hc_0: Optional[Tuple[Tensor, Tensor]] = None) -> Tensor:
+    def forward(self, inputs: Tensor, hc_0: Optional[Tuple[Tensor, Tensor]] = None) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
         # default batch first
         # input shape: (batch_size, seq_length, input_size)
         batch_size, seq_length, _input_size = inputs.shape

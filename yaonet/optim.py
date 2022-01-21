@@ -6,11 +6,11 @@ from yaonet.parameter import Parameter
 
 
 class Optimizer():
-    def __init__(self, model_params: Parameter) -> None:
-        self.model_params = model_params
+    def __init__(self, params: Callable) -> None:
+        self.params = params  # actually, model_params is a Callable type 
 
     def zero_grad(self) -> None:
-        for parameter in self.model_params():
+        for parameter in self.params():  # type:ignore
             parameter.zero_grad()
 
     def step(self) -> None:
@@ -18,10 +18,10 @@ class Optimizer():
 
 
 class SGD(Optimizer):
-    def __init__(self, module: Module, lr: float = 0.01) -> None:
-        super().__init__(module)
+    def __init__(self, params: Callable, lr: float = 0.01) -> None:
+        super().__init__(params)
         self.lr = lr
 
     def step(self) -> None:
-        for parameter in self.model_params():
+        for parameter in self.params():
             parameter -= self.lr * parameter.grad  # gradient descent

@@ -42,8 +42,8 @@ def relu(t: Tensor) -> Tensor:
 
 
 def max_pool1d(t: Tensor, 
-               kernel_size: Union[Tensor, Tuple[Tensor, ...]], 
-               stride: Optional[Union[Tensor, Tuple[Tensor, ...]]] = None) -> Tensor:
+               kernel_size: int, 
+               stride: int = None) -> Tensor:
     if stride is None:
         stride = kernel_size  # default
 
