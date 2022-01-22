@@ -5,7 +5,7 @@ from typing import Union, Tuple, Optional
 
 from yaonet.module import Module
 from yaonet.parameter import Parameter
-from yaonet.tensor import Tensor, Dependency
+from yaonet.tensor import Tensor, PreNode
 from yaonet.functional import sigmoid, tanh
 from yaonet.utils import cat
 
@@ -101,13 +101,13 @@ def im2col(image: Tensor, ksize: Tuple[int, int], stride: int = 1):
                     cnt += 1
             return new_grad
 
-        depends_on = [Dependency(image, grad_fn)]
+        pre_nodes = [PreNode(image, grad_fn)]
     else:
-        depends_on = []
+        pre_nodes = []
 
     return Tensor(image_col,
                   requires_grad,
-                  depends_on)
+                  pre_nodes)
 
 
 class Embedding(Layer):
@@ -124,7 +124,7 @@ class Embedding(Layer):
             emb.append(self.weights[item.tolist()].toarray())
 
         requires_grad = True
-        depends_on = []
+        pre_nodes = []
         if requires_grad:
             def grad_fn(grad: np.ndarray) -> np.ndarray:
                 assert grad.shape == np.shape(emb)
@@ -136,13 +136,13 @@ class Embedding(Layer):
                     pre_grad[item.tolist()] += grad[i, :, :]  # type: ignore
                 return pre_grad   # type: ignore
 
-            depends_on = [Dependency(self.weights, grad_fn)]
+            pre_nodes = [PreNode(self.weights, grad_fn)]
         else:
-            depends_on = []
+            pre_nodes = []
 
         return Tensor(emb,
                       requires_grad,
-                      depends_on)  
+                      pre_nodes)  
 
 
 class RNN(Layer):

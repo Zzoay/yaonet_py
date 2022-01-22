@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from yaonet.tensor import Dependency, Tensor, _add, _sub, _mul, _matmul, _div, ensure_tensor
+from yaonet.tensor import PreNode, Tensor, _add, _sub, _mul, _matmul, _div, ensure_tensor
 
 
 def add(t1: Tensor, t2: Tensor) -> Tensor:
@@ -30,18 +30,18 @@ def sin(t: Tensor) -> Tensor:
     data = np.sin(t.data)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             # sin'(x) = cos(x)
             return grad * np.cos(t.data)
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
 
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def cos(t: Tensor) -> Tensor:
@@ -50,18 +50,18 @@ def cos(t: Tensor) -> Tensor:
     data = np.cos(t.data)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             # cos'(x) = -sin(x)
             return grad * (-np.sin(t.data))
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
 
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def tan(t: Tensor) -> Tensor:
@@ -70,18 +70,18 @@ def tan(t: Tensor) -> Tensor:
     data = np.tan(t.data)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             # tan'(x) = 1 / cos(x)**2
             return grad * (1 / np.power(np.cos(t.data),2))
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
 
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def power(t: Tensor, n: float) -> Tensor:
@@ -90,18 +90,18 @@ def power(t: Tensor, n: float) -> Tensor:
     data = np.power(t.data, n)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             # pow(x, n) = n * pow(x, n-1)
             return grad * n * np.power(t.data, n-1)
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
     
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def exp(t: Tensor) -> Tensor:
@@ -110,18 +110,18 @@ def exp(t: Tensor) -> Tensor:
     data = np.exp(t.data)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             # exp'(x) = exp(x)
             return grad * np.exp(t.data)
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
 
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def log(a: float, t: Tensor) -> Tensor:
@@ -134,15 +134,15 @@ def log(a: float, t: Tensor) -> Tensor:
     data = loga_x(a, t.data)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             # loga'(x) = 1 / (x * ln(a)) 
             return grad * (1 / (t.data * np.log(a)))
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
 
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)

@@ -3,7 +3,7 @@ from typing import Tuple, Union, Iterable, List
 
 import numpy as np
 
-from yaonet.tensor import Tensor, Dependency
+from yaonet.tensor import Tensor, PreNode
 
 
 # previous version
@@ -27,7 +27,7 @@ def _cat(ts: Tuple[Tensor], axis: int) -> Tensor:
                 return grad.take(list(range(_l, _h)), axis=axis)
 
             offset = h
-            depends_on.append(Dependency(t, grad_fn))
+            depends_on.append(PreNode(t, grad_fn))
 
     offsets_iter = iter(offsets)
     data = np.concatenate(_data, axis=axis)
@@ -58,7 +58,7 @@ def cat(ts: Union[List[Tensor], Tuple[Tensor, ...]], axis: int) -> Tensor:
                     return grad.take(list(range(_l, _h)), axis=axis)
                 return grad_fn
 
-            depends_on.append(Dependency(t, make_func(offset, h)))
+            depends_on.append(PreNode(t, make_func(offset, h)))
             offset = h
 
     data = np.concatenate(_data, axis=axis)

@@ -4,7 +4,7 @@ import numpy as np
 from typing import List, Callable, Union, Tuple, Optional
 
 
-class Dependency():
+class PreNode():
     def __init__(self, 
                  tensor:'Tensor',
                  grad_fn: Callable[[np.ndarray], np.ndarray]) -> None: 
@@ -31,18 +31,18 @@ def ensure_tensor(tensorable: Tensorable) -> 'Tensor':
         return Tensor(tensorable)
 
 
-# a tensor includes data and dependency info.
+# a tensor includes data and previous nodes info.
 class Tensor():
     def __init__(self,
                  data: Arrayable,
                  requires_grad: bool = False,
-                 depends_on: List[Dependency] = []) -> None:
+                 pre_nodes: List[PreNode] = []) -> None:
         self._data = ensure_array(data)
         self.shape = self._data.shape
         self.ndim = self._data.ndim
 
         self.requires_grad = requires_grad
-        self.depends_on = depends_on
+        self.pre_nodes = pre_nodes
         self.grad: Optional[np.ndarray] = None
       
     @property
@@ -157,9 +157,9 @@ class Tensor():
         
         self.grad = self.grad + grad
 
-        for dependency in self.depends_on:
-            backward_grad = dependency.grad_fn(grad)
-            dependency.tensor.backward(backward_grad)
+        for pre_node in self.pre_nodes:
+            backward_grad = pre_node.grad_fn(grad)
+            pre_node.tensor.backward(backward_grad)
 
 
 def _sum(t: Tensor) -> Tensor:
@@ -171,21 +171,21 @@ def _sum(t: Tensor) -> Tensor:
             # the gradient of function 'sum' is 1 to all elements
             return grad * np.ones_like(t.data)
 
-        depends_on = [Dependency(t, grad_fn)]
+        pre_nodes = [PreNode(t, grad_fn)]
 
     else:
-        depends_on = []
+        pre_nodes = []
 
     return Tensor(data,
                   requires_grad,
-                  depends_on)
+                  pre_nodes)
 
 
 def _add(t1: Tensor, t2: Tensor) -> Tensor:
     data: Tensor = t1.data + t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
-    depends_on: List[Dependency] = []
+    pre_nodes: List[PreNode] = []
 
     if t1.requires_grad:
         def grad_fn1(grad: np.ndarray) -> np.ndarray:
@@ -201,7 +201,7 @@ def _add(t1: Tensor, t2: Tensor) -> Tensor:
 
             return grad
 
-        depends_on.append(Dependency(t1, grad_fn1))
+        pre_nodes.append(PreNode(t1, grad_fn1))
 
     if t2.requires_grad:
         def grad_fn2(grad: np.ndarray) -> np.ndarray:
@@ -217,18 +217,18 @@ def _add(t1: Tensor, t2: Tensor) -> Tensor:
 
             return grad
 
-        depends_on.append(Dependency(t2, grad_fn2))
+        pre_nodes.append(PreNode(t2, grad_fn2))
 
     return Tensor(data,
                   requires_grad,
-                  depends_on)
+                  pre_nodes)
 
 
 def _mul(t1: Tensor, t2: Tensor) -> Tensor:
     data: Tensor = t1.data * t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
-    depends_on: List[Dependency] = []
+    pre_nodes: List[PreNode] = []
 
     if t1.requires_grad:
         def grad_fn1(grad: np.ndarray) -> np.ndarray:
@@ -247,7 +247,7 @@ def _mul(t1: Tensor, t2: Tensor) -> Tensor:
 
             return grad
 
-        depends_on.append(Dependency(t1, grad_fn1))
+        pre_nodes.append(PreNode(t1, grad_fn1))
 
     if t2.requires_grad:
         def grad_fn2(grad: np.ndarray) -> np.ndarray:
@@ -266,19 +266,19 @@ def _mul(t1: Tensor, t2: Tensor) -> Tensor:
 
             return grad
 
-        depends_on.append(Dependency(t2, grad_fn2))
+        pre_nodes.append(PreNode(t2, grad_fn2))
 
     return Tensor(
             data,
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def _div(t1: Tensor, t2: Tensor) -> Tensor:
     data = t1.data / t2.data
     requires_grad: bool = t1.requires_grad or t2.requires_grad
 
-    depends_on: List[Dependency] = []
+    pre_nodes: List[PreNode] = []
 
     if t1.requires_grad:
         def grad_fn1(grad: np.ndarray) -> np.ndarray:
@@ -297,7 +297,7 @@ def _div(t1: Tensor, t2: Tensor) -> Tensor:
 
             return grad
 
-        depends_on.append(Dependency(t1, grad_fn1))
+        pre_nodes.append(PreNode(t1, grad_fn1))
 
     if t2.requires_grad:
         def grad_fn2(grad: np.ndarray) -> np.ndarray:
@@ -316,12 +316,12 @@ def _div(t1: Tensor, t2: Tensor) -> Tensor:
 
             return grad
 
-        depends_on.append(Dependency(t2, grad_fn2))
+        pre_nodes.append(PreNode(t2, grad_fn2))
 
     return Tensor(
             data,
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def _neg(t: Tensor) -> Tensor:
@@ -329,11 +329,11 @@ def _neg(t: Tensor) -> Tensor:
     requires_grad = t.requires_grad
 
     if requires_grad:
-        depends_on = [Dependency(t, lambda x: -x)]
+        pre_nodes = [PreNode(t, lambda x: -x)]
     else:
-        depends_on = []
+        pre_nodes = []
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, pre_nodes)
 
 
 def _sub(t1: Tensor, t2: Tensor) -> Tensor:
@@ -350,7 +350,7 @@ def _matmul(t1: Tensor, t2: Tensor) -> Tensor:
     data = np.matmul(t1.data, t2.data)
     requires_grad = t1.requires_grad or t2.requires_grad
 
-    depends_on: List[Dependency] = []
+    pre_nodes: List[PreNode] = []
 
     if t1.requires_grad:
         def grad_fn1(grad: np.ndarray) -> np.ndarray:
@@ -361,7 +361,7 @@ def _matmul(t1: Tensor, t2: Tensor) -> Tensor:
             else:  # means a tensor, always [batch_size, height, width], just reverse the dims apart from 1st.
                 return np.matmul(grad, t2.data.reshape(-1, *t2shape[:0:-1]))  # 
 
-        depends_on.append(Dependency(t1, grad_fn1))
+        pre_nodes.append(PreNode(t1, grad_fn1))
 
     if t2.requires_grad:
         def grad_fn2(grad: np.ndarray) -> np.ndarray:
@@ -373,11 +373,11 @@ def _matmul(t1: Tensor, t2: Tensor) -> Tensor:
 
             return np.tensordot(t1.data, grad, axes=(n, n))
 
-        depends_on.append(Dependency(t2, grad_fn2))
+        pre_nodes.append(PreNode(t2, grad_fn2))
 
     return Tensor(data,
                   requires_grad,
-                  depends_on)
+                  pre_nodes)
 
 
 # TODO unittest
@@ -394,23 +394,23 @@ def _tensordot(t1: Tensor, t2: Tensor, dims: Tuple[List[int], ...]) -> Tensor:
     dshape = list(data.shape)
 
     requires_grad = t1.requires_grad or t2.requires_grad
-    depends_on: List[Dependency] = []
+    pre_nodes: List[PreNode] = []
 
     if t1.requires_grad:
         def grad_fn1(grad: np.ndarray) -> np.ndarray:
             return np.tensordot(t2.data, grad, axes=(t2od, list(range(partition, len(dshape))))).reshape(t1shape)
 
-        depends_on.append(Dependency(t1, grad_fn1))
+        pre_nodes.append(PreNode(t1, grad_fn1))
 
     if t2.requires_grad:
         def grad_fn2(grad: np.ndarray) -> np.ndarray:
             return np.tensordot(t1.data, grad, axes=(t1od, list(range(partition)))).reshape(t2shape)
 
-        depends_on.append(Dependency(t2, grad_fn2))
+        pre_nodes.append(PreNode(t2, grad_fn2))
 
     return Tensor(data,
                   requires_grad,
-                  depends_on)
+                  pre_nodes)
 
 
 # TODO return as a view like numpy.ndarray (possibly difficult)
@@ -425,11 +425,11 @@ def _slice(t: Tensor, idxs: Union[int, List[int]]) -> Tensor:
             whole_t_grad[idxs] = grad
             return whole_t_grad
 
-        depends_on = [Dependency(t, grad_fn)]
+        pre_nodes = [PreNode(t, grad_fn)]
     else:
-        depends_on = []
+        pre_nodes = []
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, pre_nodes)
 
 
 # TODO return as a view like numpy.ndarray (possibly difficult)
@@ -443,8 +443,8 @@ def _reshape(t: Tensor, *shape):
         def grad_fn(grad: np.ndarray) -> np.ndarray:
             return grad.reshape(*pre_shape)
 
-        depends_on = [Dependency(t, grad_fn)]
+        pre_nodes = [PreNode(t, grad_fn)]
     else:
-        depends_on = []
+        pre_nodes = []
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, pre_nodes)

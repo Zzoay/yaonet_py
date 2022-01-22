@@ -3,7 +3,7 @@ from typing import Union, Optional, Tuple
 
 import numpy as np
 
-from yaonet.tensor import Dependency, Tensor, ensure_tensor
+from yaonet.tensor import PreNode, Tensor, ensure_tensor
 from yaonet.basic_functions import exp
 
 
@@ -23,7 +23,7 @@ def relu(t: Tensor) -> Tensor:
     data = np.maximum(0, t.data)
     requires_grad = t.requires_grad
 
-    depends_on = []
+    pre_nodes = []
 
     if requires_grad: 
         def grad_fn(grad: np.ndarray) -> np.ndarray:
@@ -34,11 +34,11 @@ def relu(t: Tensor) -> Tensor:
             
             return new_grad
 
-        depends_on.append(Dependency(t, grad_fn))
+        pre_nodes.append(PreNode(t, grad_fn))
 
     return Tensor(data, 
             requires_grad,
-            depends_on)
+            pre_nodes)
 
 
 def max_pool1d(t: Tensor, 
